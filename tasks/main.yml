@@ -1,0 +1,78 @@
+---
+- name: Include OS-specific variables.
+  include_vars: "{{ ansible_os_family }}.yml"
+
+# Configure technical user
+- name: Prepare user account
+  user:
+    name: activemq
+    system: true
+    home: /opt/activemq/
+    create_home: true
+
+# Install
+- name: Install base packages
+  package:
+    name: "{{item}}"
+  with_items: "{{install_packages}}"
+
+- name: Get stat information about /opt/activemq/current
+  stat:
+    path: /opt/activemq/current
+  register: stat_current
+
+# - name: Download installer from Internet
+#   get_url:
+#     url: https://archive.apache.org/dist/activemq/{{activemq_version}}/apache-activemq-{{activemq_version}}-bin.tar.gz
+#     dest: apache-activemq-{{activemq_version}}-bin.tar.gz
+#     mode: 0755
+#   delegate_to: localhost
+#   when: local_download
+#
+# - name: Create /opt/activemq/apache-activemq-{{activemq_version}} folder
+#   file:
+#     path: /opt/activemq/apache-activemq-{{activemq_version}}
+#     state: directory
+#   when: local_download
+#
+# - name: Install from source codes
+#   unarchive:
+#     src: apache-activemq-{{activemq_version}}-bin.tar.gz
+#     dest: /opt/activemq/
+#     remote_src: true
+#     owner: activemq
+#     group: activemq
+#   when: local_download
+
+- name: Install from source codes
+  unarchive:
+    src: https://archive.apache.org/dist/activemq/{{activemq_version}}/apache-activemq-{{activemq_version}}-bin.tar.gz
+    dest: /opt/activemq/
+    remote_src: true
+    owner: activemq
+    group: activemq
+  when:
+    - not local_download
+    - not stat_current.stat.exists or
+      (stat_current.stat.exists and not stat_current.stat.lnk_target is search("activemq-"+activemq_version))
+
+- name: Activate current version
+  file:
+    src: "/opt/activemq/apache-activemq-{{activemq_version}}"
+    dest: /opt/activemq/current
+    owner: activemq
+    group: activemq
+    state: link
+
+# Configure SystemD service
+- name: Systemd service
+  template:
+    src: activemq.service.j2
+    dest: /etc/systemd/system/activemq.service
+
+- name: Systemd enable service
+  systemd:
+    daemon_reload: yes
+    enabled: yes
+    name: activemq.service
+    state: started
