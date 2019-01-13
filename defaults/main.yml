@@ -15,3 +15,5 @@ activemq_topics: []
 activemq_groups_admin: admins
 activemq_groups_user: users
 activemq_groups_guest: guests
+
+activemq_route: []

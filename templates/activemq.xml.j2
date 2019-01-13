@@ -182,18 +182,17 @@
     -->
     <import resource="jetty.xml"/>
 
-
+    {% if activemq_route|length %}
     <camelContext id="camel" xmlns="http://camel.apache.org/schema/spring">
-        <route>
-            <description>All messages from Carrier Xpx to to PNR</description>
-            <from uri="activemq:q.xpx.out"/>
-            <to uri="activemq:q.pnr.in"/>
-        </route>
-        <route>
-            <description>All messages from Carrier Xtest to to PNR</description>
-            <from uri="activemq:q.xtest.out"/>
-            <to uri="activemq:q.pnr.in"/>
-        </route>
+        {% for item in activemq_route %}
+          {% if item.get('type', 'simple') == 'simple' %}
+            <route>
+                <description>All messages from {{item.from}} to {{item.to}}</description>
+                <from uri="activemq:{{item.from}}"/>
+                <to uri="activemq:{{item.to}}"/>
+            </route>
+          {% endif %}
+        {% endfor %}
     </camelContext>
 
     <bean id="activemq" class="org.apache.activemq.camel.component.ActiveMQComponent" >
@@ -205,6 +204,7 @@
           </bean>
         </property>
     </bean>
+    {% endif %}
 
 </beans>
 <!-- END SNIPPET: example -->
