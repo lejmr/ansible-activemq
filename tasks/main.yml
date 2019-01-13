@@ -23,29 +23,41 @@
   stat:
     path: /opt/activemq/current
   register: stat_current
+  tags: test
 
-# - name: Download installer from Internet
-#   get_url:
-#     url: https://archive.apache.org/dist/activemq/{{activemq_version}}/apache-activemq-{{activemq_version}}-bin.tar.gz
-#     dest: apache-activemq-{{activemq_version}}-bin.tar.gz
-#     mode: 0755
-#   delegate_to: localhost
-#   when: local_download
-#
-# - name: Create /opt/activemq/apache-activemq-{{activemq_version}} folder
-#   file:
-#     path: /opt/activemq/apache-activemq-{{activemq_version}}
-#     state: directory
-#   when: local_download
-#
-# - name: Install from source codes
-#   unarchive:
-#     src: apache-activemq-{{activemq_version}}-bin.tar.gz
-#     dest: /opt/activemq/
-#     remote_src: true
-#     owner: activemq
-#     group: activemq
-#   when: local_download
+- name: Download installer from Internet
+  get_url:
+    url: https://archive.apache.org/dist/activemq/{{activemq_version}}/apache-activemq-{{activemq_version}}-bin.tar.gz
+    dest: /tmp/apache-activemq-{{activemq_version}}-bin.tar.gz
+    mode: 0755
+  delegate_to: localhost
+  when:
+    - local_download
+    - not stat_current.stat.exists or
+      (stat_current.stat.exists and not stat_current.stat.lnk_target is search("activemq-"+activemq_version))
+  tags: test
+
+- name: Create /opt/activemq/apache-activemq-{{activemq_version}} folder
+  file:
+    path: /opt/activemq/apache-activemq-{{activemq_version}}
+    state: directory
+  when:
+    - local_download
+    - not stat_current.stat.exists or
+      (stat_current.stat.exists and not stat_current.stat.lnk_target is search("activemq-"+activemq_version))
+  tags: test
+
+- name: Install from source codes
+  unarchive:
+    src: /tmp/apache-activemq-{{activemq_version}}-bin.tar.gz
+    dest: /opt/activemq/
+    owner: activemq
+    group: activemq
+  when:
+    - local_download
+    - not stat_current.stat.exists or
+      (stat_current.stat.exists and not stat_current.stat.lnk_target is search("activemq-"+activemq_version))
+  tags: test
 
 - name: Install from source codes
   unarchive:
