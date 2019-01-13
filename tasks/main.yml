@@ -180,3 +180,12 @@
     owner: activemq
     group: activemq
   notify: restart activemq
+
+- name: configure user properties
+  template:
+    src: jetty.xml.j2
+    dest: /opt/activemq/current/conf/jetty.xml
+    mode: 0644
+    owner: activemq
+    group: activemq
+  notify: restart activemq
