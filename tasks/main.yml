@@ -78,9 +78,59 @@
     daemon_reload: yes
     enabled: yes
     name: activemq.service
-    state: started
+
+# JMX
+- name: ensure password files for jmx are not publicky readable
+  file:
+    path: "{{item}}"
+    mode: 0600
+    owner: activemq
+    group: activemq
+  loop:
+    - /opt/activemq/current/conf/jmx.access
+
+- name: configure jmx passwords
+  template:
+    src: jmx.password.j2
+    dest: /opt/activemq/current/conf/jmx.password
+    mode: 0600
+    owner: activemq
+    group: activemq
+
+- name: configure jetty passwords
+  template:
+    src: jetty-realm.properties.j2
+    dest: /opt/activemq/current/conf/jetty-realm.properties
+    mode: 0644
+    owner: activemq
+    group: activemq
+  notify: restart activemq
+
+# Prepare SSL keystore
+- name: Prepare java keystore passphrase
+  set_fact:
+    activemq_ssl_jkspass: "{{ansible_date_time.iso8601_micro | to_uuid}}"
+  when: activemq_ssl_key and activemq_ssl_certificate
+
+- name: Build java keystore
+  java_keystore:
+    name: activemq
+    certificate: "{{activemq_ssl_certificate}}"
+    private_key: "{{activemq_ssl_key}}"
+    password: "{{activemq_ssl_jkspass}}"
+    dest: /opt/activemq/current/conf/keystore.jks
+    owner: activemq
+    group: activemq
+    mode: 0650
+    force: true
+  notify: restart activemq
+  when: activemq_ssl_key and activemq_ssl_certificate
 
 # Configure ActiveMQ
+- name: Merge transport_connector options
+  set_fact:
+    activemq_transport_connector: "{{activemq_transport_connector_default|combine_listmap(activemq_transport_connector)}}"
+
 - name: Configure ActiveMQ (activemq.xml)
   template:
     src: activemq.xml.j2
@@ -88,4 +138,33 @@
     owner: activemq
     group: activemq
     mode: 0644
+  notify: restart activemq
   tags: config
+
+- name: Configure ActiveMQ (env)
+  template:
+    src: env.j2
+    dest: /opt/activemq/current/bin/env
+    owner: activemq
+    group: activemq
+    mode: 0644
+  notify: restart activemq
+  tags: config
+
+- name: configure user passwords
+  template:
+    src: credentials.properties.j2
+    dest: /opt/activemq/current/conf/credentials.properties
+    mode: 0640
+    owner: activemq
+    group: activemq
+  notify: restart activemq
+
+- name: configure user properties
+  template:
+    src: users.properties.j2
+    dest: /opt/activemq/current/conf/users.properties
+    mode: 0640
+    owner: activemq
+    group: activemq
+  notify: restart activemq

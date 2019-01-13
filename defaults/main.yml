@@ -2,18 +2,86 @@
 activemq_version: 5.15.8
 local_download: true
 
+# Performance parameters
 activemq_memory_usage_percentage: 70
 activemq_store_usage: 100
 activemq_store_usage_unit: gb
 activemq_temp_usage: 50
 activemq_temp_usage_unit: gb
+activemmq_xms: 64M
+activemmq_xmx: 1G
 
+# Users and permissions
+activemq_admin_password: manager
+activemq_guest_password: password
 activemq_users: []
 activemq_queues: []
 activemq_topics: []
-
 activemq_groups_admin: admins
 activemq_groups_user: users
 activemq_groups_guest: guests
 
+# Message routing
 activemq_route: []
+
+# JMX
+activemq_jmx_enabled: true
+activemq_jmx_port: 11099
+
+# SSL
+activemq_ssl_certificate: null
+activemq_ssl_key: null
+activemq_ssl_jkspass: changeit
+
+# Connectors
+activemq_transport_connector: []
+activemq_transport_connector_default:
+  - protocol: openwire
+    enabled: true
+    ssl: false
+    host: 0.0.0.0
+    port: 61616
+    port_ssl: 61617
+    uri_protocol: tcp
+    uri_protocol_ssl: ssl
+    protocol_ssl: ssl
+    options:
+      maximumConnections: 1000
+      wireFormat.maxFrameSize: 104857600
+  - protocol: amqp
+    enabled: true
+    ssl: false
+    host: 0.0.0.0
+    port: 5672
+    port_ssl: 5673
+    options:
+      maximumConnections: 1000
+      wireFormat.maxFrameSize: 104857600
+  - protocol: stomp
+    enabled: true
+    ssl: false
+    host: 0.0.0.0
+    port: 61613
+    port_ssl: 61612
+    options:
+      maximumConnections: 1000
+      wireFormat.maxFrameSize: 104857600
+  - protocol: mqtt
+    enabled: true
+    ssl: false
+    host: 0.0.0.0
+    port: 1883
+    port_ssl: 1884
+    options:
+      maximumConnections: 1000
+      wireFormat.maxFrameSize: 104857600
+  - protocol: ws
+    enabled: true
+    ssl: false
+    host: 0.0.0.0
+    port: 61614
+    port_ssl: 61615
+    protocol_ssl: wss
+    options:
+      maximumConnections: 1000
+      wireFormat.maxFrameSize: 104857600

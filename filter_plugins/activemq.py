@@ -5,6 +5,8 @@ class FilterModule(object):
             'read_camelcase': self.read_camelcase,
             'write_camelcase': self.write_camelcase,
             'admin_camelcase': self.admin_camelcase,
+            'combine_listmap': self.combine_listmap,
+            'activemq_options': self.activemq_options
         }
 
     def rename_camelcase(self, tpl):
@@ -30,3 +32,16 @@ class FilterModule(object):
 
     def admin_camelcase(self, q):
         return self.xxx_camelcase(q, "Admin")
+
+    def combine_listmap(self, default, configuration):
+        updated = []
+        for conf in default:
+            nconf = next((item for item in configuration if item['protocol'] == conf["protocol"]), None)
+            z = conf.copy()
+            if nconf:
+               z.update(nconf)
+            updated.append(z)
+        return updated
+
+    def activemq_options(self, options):
+        return '&amp;'.join([ "=".join([str(y) for y in x]) for x in options.items()])

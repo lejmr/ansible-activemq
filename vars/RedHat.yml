@@ -2,3 +2,4 @@ install_packages:
   - java-1.8.0-openjdk
   - python2-jmespath
   - python-pip
+  - openssl
