@@ -2,6 +2,9 @@
 - name: Include OS-specific variables.
   include_vars: "{{ ansible_os_family }}.yml"
 
+  # TODO: validate the permission to queues overlaps with defined queues/topics
+
+
 # Configure technical user
 - name: Prepare user account
   user:
@@ -76,3 +79,13 @@
     enabled: yes
     name: activemq.service
     state: started
+
+# Configure ActiveMQ
+- name: Configure ActiveMQ (activemq.xml)
+  template:
+    src: activemq.xml.j2
+    dest: /opt/activemq/current/conf/activemq.xml
+    owner: activemq
+    group: activemq
+    mode: 0644
+  tags: config

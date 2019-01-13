@@ -1,0 +1,210 @@
+<!--
+         Licensed to the Apache Software Foundation (ASF) under one or more
+    contributor license agreements.  See the NOTICE file distributed with
+    this work for additional information regarding copyright ownership.
+    The ASF licenses this file to You under the Apache License, Version 2.0
+    (the "License"); you may not use this file except in compliance with
+    the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!-- START SNIPPET: example -->
+<beans
+  xmlns="http://www.springframework.org/schema/beans"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+  http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd
+  http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+  http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- Allows us to use system properties as variables in this configuration file -->
+    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <value>file:${activemq.conf}/credentials.properties</value>
+        </property>
+    </bean>
+
+   <!-- Allows accessing the server log -->
+    <bean id="logQuery" class="io.fabric8.insight.log.log4j.Log4jLogQuery"
+          lazy-init="false" scope="singleton"
+          init-method="start" destroy-method="stop">
+    </bean>
+
+    <!--
+                 The <broker> element is used to configure the ActiveMQ broker.
+    -->
+    <broker useJmx="true" xmlns="http://activemq.apache.org/schema/core" brokerName="localhost" dataDirectory="${activemq.data}">
+
+        <destinationPolicy>
+            <policyMap>
+              <policyEntries>
+                <policyEntry topic=">" >
+                    <!-- The constantPendingMessageLimitStrategy is used to prevent
+                                                  slow topic consumers to block producers and affect other consumers
+                         by limiting the number of messages that are retained
+                         For more information, see:
+
+                         http://activemq.apache.org/slow-consumer-handling.html
+
+                    -->
+                  <pendingMessageLimitStrategy>
+                    <constantPendingMessageLimitStrategy limit="1000"/>
+                  </pendingMessageLimitStrategy>
+                </policyEntry>
+              </policyEntries>
+            </policyMap>
+        </destinationPolicy>
+
+
+        <!--
+                         The managementContext is used to configure how ActiveMQ is exposed in
+            JMX. By default, ActiveMQ uses the MBean server that is started by
+            the JVM. For more information, see:
+
+            http://activemq.apache.org/jmx.html
+        -->
+        <managementContext>
+            <managementContext createConnector="false"/>
+        </managementContext>
+
+        <!--
+                         Configure message persistence for the broker. The default persistence
+            mechanism is the KahaDB store (identified by the kahaDB tag).
+            For more information, see:
+
+            http://activemq.apache.org/persistence.html
+        -->
+        <persistenceAdapter>
+            <kahaDB directory="${activemq.data}/kahadb"/>
+        </persistenceAdapter>
+
+
+          <!--
+                           The systemUsage controls the maximum amount of space the broker will
+            use before disabling caching and/or slowing down producers. For more information, see:
+            http://activemq.apache.org/producer-flow-control.html
+          -->
+          <systemUsage>
+            <systemUsage>
+                <memoryUsage>
+                    <memoryUsage percentOfJvmHeap="{{activemq_memory_usage_percentage}}" />
+                </memoryUsage>
+                <storeUsage>
+                    <storeUsage limit="{{activemq_store_usage}} {{activemq_store_usage_unit}}"/>
+                </storeUsage>
+                <tempUsage>
+                    <tempUsage limit="{{activemq_temp_usage}} {{activemq_temp_usage_unit}}"/>
+                </tempUsage>
+            </systemUsage>
+        </systemUsage>
+
+        <!--
+                         The transport connectors expose ActiveMQ over a given protocol to
+            clients and other brokers. For more information, see:
+
+            http://activemq.apache.org/configuring-transports.html
+        -->
+        <transportConnectors>
+            <!-- DOS protection, limit concurrent connections to 1000 and frame size to 100MB -->
+            <transportConnector name="openwire" uri="tcp://0.0.0.0:61616?maximumConnections=1000&amp;wireFormat.maxFrameSize=104857600"/>
+            <transportConnector name="amqp" uri="amqp://0.0.0.0:5672?maximumConnections=1000&amp;wireFormat.maxFrameSize=104857600"/>
+            <transportConnector name="stomp" uri="stomp://0.0.0.0:61613?maximumConnections=1000&amp;wireFormat.maxFrameSize=104857600"/>
+            <transportConnector name="mqtt" uri="mqtt://0.0.0.0:1883?maximumConnections=1000&amp;wireFormat.maxFrameSize=104857600&amp;transport.activeMQSubscriptionPrefetch=32766"/>
+            <transportConnector name="ws" uri="ws://0.0.0.0:61614?maximumConnections=1000&amp;wireFormat.maxFrameSize=104857600"/>
+        </transportConnectors>
+
+        <!-- destroy the spring context on shutdown to stop jetty -->
+        <shutdownHooks>
+            <bean xmlns="http://www.springframework.org/schema/beans" class="org.apache.activemq.hooks.SpringContextHook" />
+        </shutdownHooks>
+
+        <!-- destination build on boot time -->
+        <destinations>
+              {% for queue in activemq_queues -%}
+              <queue physicalName="{{queue}}" />
+              {% endfor -%}
+              {% for topic in activemq_topics -%}
+              <topic physicalName="{{topic}}" />
+              {% endfor %}
+
+        </destinations>
+
+
+           <plugins>
+               <!-- Configure authentication; Username, passwords and groups -->
+               <simpleAuthenticationPlugin>
+                   <users>
+                     {% for user in activemq_users -%}
+                     <authenticationUser username="{{user.username}}" password="{{user.password}}" groups="{{ (user.read|default([]), user.write|default([]), user.admin|default([]), user.groups|default([]))|activemq_camelcase|join(',')}}" />
+                     {% endfor %}
+
+                   <users>
+               </simpleAuthenticationPlugin>
+
+
+             <!--  Lets configure a destination based authorization mechanism -->
+             <authorizationPlugin>
+               <map>
+                 <authorizationMap>
+                   <authorizationEntries>
+                     <authorizationEntry topic=">" read="{{activemq_groups_admin}}" write="{{activemq_groups_admin}}" admin="{{activemq_groups_admin}}"/>
+                     <authorizationEntry queue=">" read="{{activemq_groups_admin}}" write="{{activemq_groups_admin}}" admin="{{activemq_groups_admin}}"/>
+                     <authorizationEntry topic="ActiveMQ.Advisory.>" read="{{activemq_groups_guest}},{{activemq_groups_user}}" write="{{activemq_groups_guest}},{{activemq_groups_user}}" admin="{{activemq_groups_guest}},{{activemq_groups_user}}"/>
+
+
+                     {% for queue in activemq_queues -%}
+                     <authorizationEntry queue="{{queue}}" read="{{queue|read_camelcase}}" write="{{queue|write_camelcase}}" admin="{{activemq_groups_admin}},{{queue|admin_camelcase}}"/>
+                     {% endfor -%}
+                     {% for topic in activemq_topics -%}
+                     <authorizationEntry topic="{{topic}}" read="{{topic|read_camelcase}}" write="{{topic|write_camelcase}}" admin="{{activemq_groups_admin}},{{topic|admin_camelcase}}"/>
+                     {% endfor -%}
+
+
+                   </authorizationEntries>
+                 </authorizationMap>
+               </map>
+             </authorizationPlugin>
+           </plugins>
+
+    </broker>
+
+    <!--
+                 Enable web consoles, REST and Ajax APIs and demos
+        The web consoles requires by default login, you can disable this in the jetty.xml file
+
+        Take a look at ${ACTIVEMQ_HOME}/conf/jetty.xml for more details
+    -->
+    <import resource="jetty.xml"/>
+
+
+    <camelContext id="camel" xmlns="http://camel.apache.org/schema/spring">
+        <route>
+            <description>All messages from Carrier Xpx to to PNR</description>
+            <from uri="activemq:q.xpx.out"/>
+            <to uri="activemq:q.pnr.in"/>
+        </route>
+        <route>
+            <description>All messages from Carrier Xtest to to PNR</description>
+            <from uri="activemq:q.xtest.out"/>
+            <to uri="activemq:q.pnr.in"/>
+        </route>
+    </camelContext>
+
+    <bean id="activemq" class="org.apache.activemq.camel.component.ActiveMQComponent" >
+        <property name="connectionFactory">
+          <bean class="org.apache.activemq.ActiveMQConnectionFactory">
+            <property name="brokerURL" value="vm://localhost?create=false"/>
+            <property name="userName" value="${activemq.username}"/>
+            <property name="password" value="${activemq.password}"/>
+          </bean>
+        </property>
+    </bean>
+
+</beans>
+<!-- END SNIPPET: example -->
